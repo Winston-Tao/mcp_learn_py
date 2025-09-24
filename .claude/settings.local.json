@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:spec.modelcontextprotocol.io)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:support.claude.com)",
+      "Bash(sudo apt:*)",
+      "Bash(source ~/.bashrc)",
+      "Bash(export PYENV_ROOT=\"$HOME/.pyenv\")",
+      "Bash(export PATH=\"$PYENV_ROOT/bin:$PATH\")",
+      "Bash(pyenv:*)",
+      "Bash(export PATH=\"$HOME/.local/bin:$PATH\")",
+      "Bash(uv run:*)",
+      "Bash(curl:*)",
+      "Bash(uv sync:*)",
+      "Bash(chmod:*)",
+      "Bash(./scripts/mcp_server.sh --help)",
+      "Bash(python:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
