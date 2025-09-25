@@ -112,56 +112,74 @@ class HTTPTransportServer:
                 # Get request data
                 request_data = await request.json()
 
+                # Log the complete request for debugging
+                self.logger.info(f"MCP Request received:")
+                self.logger.info(f"  Method: {request_data.get('method')}")
+                self.logger.info(f"  ID: {request_data.get('id')}")
+                self.logger.info(f"  JSON-RPC Version: {request_data.get('jsonrpc')}")
+                self.logger.info(f"  Params: {request_data.get('params')}")
+                if self.config.debug:
+                    self.logger.info(f"  Full Request: {request_data}")
+
                 # Validate basic JSON-RPC structure
                 if request_data.get("jsonrpc") != "2.0":
-                    return JSONResponse(
-                        status_code=400,
-                        content={
-                            "jsonrpc": "2.0",
-                            "id": request_data.get("id"),
-                            "error": {
-                                "code": -32600,
-                                "message": "Invalid JSON-RPC version"
-                            }
+                    return log_and_return_response({
+                        "jsonrpc": "2.0",
+                        "id": request_data.get("id"),
+                        "error": {
+                            "code": -32600,
+                            "message": "Invalid JSON-RPC version"
                         }
-                    )
+                    }, 400)
 
                 # Handle MCP methods
                 method = request_data.get("method")
 
+                # Function to log response and return it
+                def log_and_return_response(response_content, status_code=200):
+                    self.logger.info(f"MCP Response for method '{method}':")
+                    self.logger.info(f"  Status Code: {status_code}")
+                    self.logger.info(f"  Response ID: {response_content.get('id')}")
+                    if 'result' in response_content:
+                        self.logger.info(f"  Result Type: {type(response_content['result']).__name__}")
+                        if self.config.debug:
+                            self.logger.info(f"  Full Result: {response_content['result']}")
+                    elif 'error' in response_content:
+                        self.logger.info(f"  Error Code: {response_content['error'].get('code')}")
+                        self.logger.info(f"  Error Message: {response_content['error'].get('message')}")
+                    if self.config.debug:
+                        self.logger.info(f"  Full Response: {response_content}")
+                    return JSONResponse(status_code=status_code, content=response_content)
+
                 if method == "initialize":
                     # Return proper initialization response without error field
-                    return JSONResponse(
-                        content={
-                            "jsonrpc": "2.0",
-                            "id": request_data.get("id"),
-                            "result": {
-                                "protocolVersion": "2025-06-18",
-                                "serverInfo": {
-                                    "name": self.config.server_name,
-                                    "version": self.config.server_version
-                                },
-                                "capabilities": {
-                                    "resources": {"subscribe": True, "listChanged": True},
-                                    "tools": {"listChanged": True},
-                                    "prompts": {"listChanged": True},
-                                    "logging": {}
-                                }
+                    return log_and_return_response({
+                        "jsonrpc": "2.0",
+                        "id": request_data.get("id"),
+                        "result": {
+                            "protocolVersion": "2025-06-18",
+                            "serverInfo": {
+                                "name": self.config.server_name,
+                                "version": self.config.server_version
+                            },
+                            "capabilities": {
+                                "resources": {"subscribe": True, "listChanged": True},
+                                "tools": {"listChanged": True},
+                                "prompts": {"listChanged": True},
+                                "logging": {}
                             }
                         }
-                    )
+                    })
 
                 elif method == "logging/setLevel":
                     # Handle logging level setting
                     level = request_data.get("params", {}).get("level", "INFO")
                     self.logger.info(f"Setting log level to: {level}")
-                    return JSONResponse(
-                        content={
-                            "jsonrpc": "2.0",
-                            "id": request_data.get("id"),
-                            "result": {}
-                        }
-                    )
+                    return log_and_return_response({
+                        "jsonrpc": "2.0",
+                        "id": request_data.get("id"),
+                        "result": {}
+                    })
 
                 elif method == "tools/list":
                     # List available tools
@@ -257,6 +275,119 @@ class HTTPTransportServer:
                         }
                     )
 
+                elif method == "tools/call":
+                    # Handle tool calls
+                    params = request_data.get("params", {})
+                    tool_name = params.get("name")
+                    tool_args = params.get("arguments", {})
+
+                    self.logger.info(f"Tool call: {tool_name} with args: {tool_args}")
+
+                    try:
+                        # Import the calculator tool
+                        from .tools.calculator import CalculatorTool
+                        calc_tool = CalculatorTool(self.mcp_server)
+
+                        if tool_name == "calculate":
+                            result = await calc_tool._calculate(tool_args.get("expression", ""))
+                            return JSONResponse(
+                                content={
+                                    "jsonrpc": "2.0",
+                                    "id": request_data.get("id"),
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": f"Result: {result.formatted_result}\n\nExpression: {result.expression}\nResult Type: {result.result_type}"
+                                            }
+                                        ]
+                                    }
+                                }
+                            )
+                        elif tool_name == "solve_quadratic":
+                            a = tool_args.get("a", 0)
+                            b = tool_args.get("b", 0)
+                            c = tool_args.get("c", 0)
+                            result = await calc_tool._solve_quadratic(a, b, c)
+                            return JSONResponse(
+                                content={
+                                    "jsonrpc": "2.0",
+                                    "id": request_data.get("id"),
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": f"Equation: {result['equation']}\nType: {result['type']}\nSolutions: {result['solutions']}\nMessage: {result['message']}"
+                                            }
+                                        ]
+                                    }
+                                }
+                            )
+                        elif tool_name == "unit_converter":
+                            value = tool_args.get("value", 0)
+                            from_unit = tool_args.get("from_unit", "")
+                            to_unit = tool_args.get("to_unit", "")
+                            unit_type = tool_args.get("unit_type", "length")
+                            result = await calc_tool._unit_converter(value, from_unit, to_unit, unit_type)
+                            return JSONResponse(
+                                content={
+                                    "jsonrpc": "2.0",
+                                    "id": request_data.get("id"),
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": result["formatted_result"]
+                                            }
+                                        ]
+                                    }
+                                }
+                            )
+                        elif tool_name == "statistics_calculator":
+                            numbers = tool_args.get("numbers", [])
+                            operation = tool_args.get("operation", "all")
+                            result = await calc_tool._statistics_calculator(numbers, operation)
+                            stats_text = f"Numbers: {result['numbers']}\nOperation: {result['operation']}\n\nStatistics:\n"
+                            for key, value in result['statistics'].items():
+                                stats_text += f"{key}: {value}\n"
+                            return JSONResponse(
+                                content={
+                                    "jsonrpc": "2.0",
+                                    "id": request_data.get("id"),
+                                    "result": {
+                                        "content": [
+                                            {
+                                                "type": "text",
+                                                "text": stats_text
+                                            }
+                                        ]
+                                    }
+                                }
+                            )
+                        else:
+                            return JSONResponse(
+                                content={
+                                    "jsonrpc": "2.0",
+                                    "id": request_data.get("id"),
+                                    "error": {
+                                        "code": -32601,
+                                        "message": f"Unknown tool: {tool_name}"
+                                    }
+                                }
+                            )
+                    except Exception as e:
+                        self.logger.error(f"Tool execution error: {e}")
+                        return JSONResponse(
+                            content={
+                                "jsonrpc": "2.0",
+                                "id": request_data.get("id"),
+                                "error": {
+                                    "code": -32603,
+                                    "message": f"Tool execution failed: {str(e)}"
+                                }
+                            }
+                        )
+
                 elif method == "prompts/list":
                     # List available prompts
                     return JSONResponse(
@@ -310,32 +441,39 @@ class HTTPTransportServer:
                         }
                     )
 
-            except json.JSONDecodeError:
-                return JSONResponse(
-                    status_code=400,
-                    content={
-                        "jsonrpc": "2.0",
-                        "id": None,
-                        "error": {
-                            "code": -32700,
-                            "message": "Parse error"
-                        }
+            except json.JSONDecodeError as e:
+                self.logger.error(f"JSON decode error: {e}")
+                response_content = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {
+                        "code": -32700,
+                        "message": "Parse error"
                     }
-                )
+                }
+                self.logger.info(f"MCP Error Response:")
+                self.logger.info(f"  Status Code: 400")
+                self.logger.info(f"  Error: Parse error")
+                if self.config.debug:
+                    self.logger.info(f"  Full Response: {response_content}")
+                return JSONResponse(status_code=400, content=response_content)
             except Exception as e:
                 self.logger.error(f"MCP request error: {e}")
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "jsonrpc": "2.0",
-                        "id": request_data.get("id") if "request_data" in locals() else None,
-                        "error": {
-                            "code": -32603,
-                            "message": "Internal error",
-                            "data": str(e) if self.config.debug else None
-                        }
+                response_content = {
+                    "jsonrpc": "2.0",
+                    "id": request_data.get("id") if "request_data" in locals() else None,
+                    "error": {
+                        "code": -32603,
+                        "message": "Internal error",
+                        "data": str(e) if self.config.debug else None
                     }
-                )
+                }
+                self.logger.info(f"MCP Error Response:")
+                self.logger.info(f"  Status Code: 500")
+                self.logger.info(f"  Error: {str(e)}")
+                if self.config.debug:
+                    self.logger.info(f"  Full Response: {response_content}")
+                return JSONResponse(status_code=500, content=response_content)
 
         @self.app.get("/metrics")
         async def metrics():
