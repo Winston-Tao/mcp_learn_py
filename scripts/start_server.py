@@ -1,143 +1,113 @@
 #!/usr/bin/env python3
-"""Start script for MCP Learning Server."""
+"""启动MCP学习服务器"""
 
+import sys
 import argparse
 import asyncio
-import signal
-import sys
 from pathlib import Path
 
-# Add src directory to path for local imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add the src directory to the path
+src_path = Path(__file__).parent.parent / "src"
+sys.path.insert(0, str(src_path))
 
-from src.server import main as start_stdio_server
 from src.http_server import start_http_server
-from src.utils.logger import get_logger, log_server_shutdown
+from src.utils.logger import get_logger
 from src.utils.config import get_config
+from src.config.tools_config import get_tools_config_manager
+
+logger = get_logger(__name__)
 
 
-def signal_handler(signum, frame):
-    """Handle shutdown signals gracefully."""
-    logger = get_logger(__name__)
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
-    log_server_shutdown()
-    sys.exit(0)
-
-
-def setup_signal_handlers():
-    """Setup signal handlers for graceful shutdown."""
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
-
-
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="MCP Learning Server",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python start_server.py                    # Start with stdio transport (default)
-  python start_server.py --transport http  # Start with HTTP transport
-  python start_server.py --transport http --host 0.0.0.0 --port 8080
-        """
-    )
-
+async def main():
+    """主函数"""
+    parser = argparse.ArgumentParser(description="MCP Learning Server with Dynamic Tool Registry")
     parser.add_argument(
         "--transport",
         choices=["stdio", "http"],
         default="stdio",
         help="Transport protocol to use (default: stdio)"
     )
-
     parser.add_argument(
         "--host",
-        type=str,
-        help="Server host (only for HTTP transport)"
+        default=None,
+        help="Host to bind HTTP server (default: from config)"
     )
-
     parser.add_argument(
         "--port",
         type=int,
-        help="Server port (only for HTTP transport)"
+        default=None,
+        help="Port to bind HTTP server (default: from config)"
     )
-
     parser.add_argument(
-        "--debug",
+        "--config",
+        help="Path to tools configuration file"
+    )
+    parser.add_argument(
+        "--list-tools",
         action="store_true",
-        help="Enable debug mode"
+        help="List all available tools and exit"
     )
-
     parser.add_argument(
-        "--version",
-        action="version",
-        version="MCP Learning Server 0.1.0"
+        "--reload-config",
+        action="store_true",
+        help="Reload tools configuration and exit"
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
 
-
-async def start_server_with_transport(transport: str, host: str = None, port: int = None):
-    """Start the server with specified transport."""
-    setup_signal_handlers()
+    # 获取配置
     config = get_config()
-    logger = get_logger(__name__)
+    tools_config = get_tools_config_manager()
 
-    try:
-        if transport == "stdio":
-            logger.info("Starting MCP server with STDIO transport")
-            await start_stdio_server()
-        elif transport == "http":
-            logger.info(f"Starting MCP server with HTTP transport")
-            await start_http_server(host=host, port=port)
-        else:
-            raise ValueError(f"Unknown transport: {transport}")
+    # 如果指定了配置文件
+    if args.config:
+        tools_config.config_file = args.config
+        tools_config.reload_config()
 
-    except KeyboardInterrupt:
-        logger.info("Received KeyboardInterrupt, shutting down...")
-        log_server_shutdown()
-    except Exception as e:
-        logger.error("Server startup failed", error=str(e), exc_info=True)
-        sys.exit(1)
+    # 处理工具列表请求
+    if args.list_tools:
+        print("Available Tools:")
+        print("=" * 50)
 
+        providers = tools_config.get_enabled_providers()
+        for provider in providers:
+            print(f"\nProvider: {provider.name} ({provider.provider_class})")
+            provider_tools = tools_config.get_enabled_tools(provider.name)
+            for tool in provider_tools:
+                status = "✓" if tool.enabled else "✗"
+                print(f"  {status} {tool.name} ({tool.category})")
 
-def main():
-    """Main entry point."""
-    # Check Python version
-    if sys.version_info < (3, 9):
-        print("Error: Python 3.9 or higher is required")
-        sys.exit(1)
+        print(f"\nTotal: {len(tools_config.get_enabled_tools())} enabled tools")
+        return
 
-    # Parse arguments
-    args = parse_arguments()
+    # 处理配置重载请求
+    if args.reload_config:
+        print("Reloading tools configuration...")
+        tools_config.reload_config()
+        print("Configuration reloaded successfully!")
+        return
 
-    # Validate arguments
+    # 启动服务器
+    if args.transport == "stdio":
+        logger.info("STDIO transport is not implemented, using HTTP transport")
+        args.transport = "http"
+
     if args.transport == "http":
-        if args.host is None:
-            config = get_config()
-            args.host = config.server_host
-        if args.port is None:
-            config = get_config()
-            args.port = config.server_port
-    elif args.host or args.port:
-        print("Warning: --host and --port are only used with HTTP transport")
-
-    # Set debug mode if requested
-    if args.debug:
-        import os
-        os.environ["DEBUG"] = "true"
-
-    # Print startup information
-    print(f"MCP Learning Server")
-    print(f"Transport: {args.transport}")
-    if args.transport == "http":
-        print(f"Address: http://{args.host}:{args.port}")
-    print(f"Press Ctrl+C to stop")
-    print("-" * 50)
-
-    # Run the server
-    asyncio.run(start_server_with_transport(args.transport, args.host, args.port))
+        logger.info("Starting MCP Learning Server with HTTP transport")
+        try:
+            await start_http_server(host=args.host, port=args.port)
+        except KeyboardInterrupt:
+            logger.info("Server stopped by user")
+        except Exception as e:
+            logger.error(f"Server error: {e}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nServer stopped by user")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)

@@ -86,6 +86,7 @@ async def main():
     # Import and register all handlers with the official SDK
     from .resources import FileManagerResource, SystemInfoResource
     from .tools import CalculatorTool, FileOperationsTool, WebScraperTool
+    from .tools.xiaohongshu_tool import XiaohongshuTool
     from .prompts import PromptTemplates
 
     # Register components with the MCP server
@@ -95,6 +96,7 @@ async def main():
     calculator = CalculatorTool(server)
     file_ops = FileOperationsTool(server)
     web_scraper = WebScraperTool(server)
+    xiaohongshu = XiaohongshuTool(server)
     prompts = PromptTemplates(server)
 
     # Register handlers using the new official SDK pattern
@@ -103,6 +105,7 @@ async def main():
     await calculator.register()
     await file_ops.register()
     await web_scraper.register()
+    await xiaohongshu.register()
     await prompts.register()
 
     # Start server with official SDK

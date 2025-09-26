@@ -1,33 +1,58 @@
 # MCP Learning Server
 
-A comprehensive Model Context Protocol (MCP) server implementation for learning and understanding MCP's core concepts and architecture.
+A comprehensive Model Context Protocol (MCP) server with dynamic tool registry, featuring advanced social media automation and mathematical computation capabilities.
 
 ## 🎯 Project Overview
 
-This project is designed to help developers understand the Model Context Protocol (MCP) by providing a complete, well-documented server implementation. It demonstrates all key MCP concepts including Resources, Tools, and Prompts through practical examples.
+This project demonstrates modern MCP server architecture with a dynamic tool registration system. It supports multiple tool providers, configurable tool management, and provides both computational tools and social media automation capabilities.
 
 ## 🏗️ Architecture
 
-MCP enables AI applications to connect with external systems through a standardized protocol. This server demonstrates:
+Built with a clean, scalable architecture featuring:
 
-- **Resources**: Read-only data endpoints (like REST GET requests)
-- **Tools**: Functions that perform actions or computations
-- **Prompts**: Reusable templates for LLM interactions
-- **HTTP Transport**: Remote server deployment capability
+- **Dynamic Tool Registry**: Runtime tool registration and management
+- **Tool Providers**: Modular tool organization by functionality
+- **Configuration Management**: JSON-based tool configuration with hot reload
+- **HTTP Transport**: Production-ready HTTP server with JSON-RPC support
+- **Error Handling**: Comprehensive error handling with retry mechanisms
+
+### Core Components
+
+- `src/core/tool_registry.py` - Central tool management system
+- `src/core/tool_providers.py` - Tool provider implementations
+- `src/config/tools_config.py` - Configuration management
+- `src/http_server.py` - HTTP transport server
+- `src/config/tools.json` - Tool configuration file
 
 ## 🚀 Features
+
+### Available Tools (13 tools across 2 categories)
+
+#### Calculator Tools (4 tools)
+- **calculate**: Perform mathematical calculations
+- **solve_quadratic**: Solve quadratic equations ax² + bx + c = 0
+- **unit_converter**: Convert between different units
+- **statistics_calculator**: Calculate statistical measures
+
+#### Xiaohongshu Tools (9 tools)
+- **check_login_status**: Check Xiaohongshu login status
+- **get_login_qrcode**: Get login QR code for authentication
+- **wait_for_login**: Wait for user to complete login process
+- **publish_content**: Publish text/image content to Xiaohongshu
+- **list_feeds**: Get recommended feed list from homepage
+- **search_feeds**: Search content by keyword
+- **get_feed_detail**: Get detailed post information
+- **post_comment_to_feed**: Post comments to specific posts
+- **user_profile**: Get user profile information
 
 ### Resources
 - **File Manager**: Browse and read files from the file system
 - **System Info**: Get system information and resource usage
 
-### Tools
-- **Calculator**: Perform mathematical calculations
-- **File Operations**: Create, read, update, and delete files
-- **Web Scraper**: Extract content from web pages
-
 ### Prompts
-- **Code Review**: Template for code analysis
+- **Code Review**: Template for comprehensive code analysis
+- **Documentation**: Generate documentation for code
+- **Data Analysis**: Analyze data with customizable approaches
 - **Documentation**: Template for generating documentation
 - **Data Analysis**: Template for analyzing datasets
 
@@ -108,6 +133,50 @@ mcp-server
 ```
 
 The server will start on `http://localhost:8000` by default.
+
+## 🔑 Xiaohongshu Login Management
+
+The framework now includes comprehensive login management with cookie persistence:
+
+### Interactive Login
+
+```bash
+# Check current login status
+./scripts/mcp_server.sh login status
+
+# Start interactive login process
+./scripts/mcp_server.sh login interactive
+
+# Get cookie information
+./scripts/mcp_server.sh login info
+
+# Clear saved login session
+./scripts/mcp_server.sh login clear
+```
+
+### Direct Login Script
+
+```bash
+# Using the login script directly
+uv run python scripts/login.py --status      # Check status
+uv run python scripts/login.py --login       # Interactive login
+uv run python scripts/login.py --clear       # Clear session
+uv run python scripts/login.py --info        # Show cookie info
+```
+
+### Key Features
+
+- **Cookie Persistence**: Login sessions are automatically saved and restored
+- **QR Code Support**: Get login QR codes for mobile authentication
+- **Reliable Detection**: Uses precise selectors for accurate login status checking
+- **Cross-platform**: Works on Windows, macOS, and Linux
+- **Multiple Methods**: Interactive login, QR code, or manual browser login
+
+### MCP Tools for Login
+
+- `check_login_status` - Check if logged into Xiaohongshu
+- `get_login_qrcode` - Get QR code image for mobile login
+- `wait_for_login` - Wait for login completion with timeout
 
 ## 🧪 Testing
 

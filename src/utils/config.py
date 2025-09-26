@@ -43,6 +43,14 @@ class Settings(BaseSettings):
     enable_metrics: bool = Field(default=True, env="ENABLE_METRICS")
     metrics_port: int = Field(default=9090, env="METRICS_PORT")
 
+    # Xiaohongshu Settings
+    xiaohongshu_headless: bool = Field(default=True, env="XIAOHONGSHU_HEADLESS")
+    xiaohongshu_browser_path: Optional[str] = Field(default=None, env="XIAOHONGSHU_BROWSER_PATH")
+    xiaohongshu_timeout: int = Field(default=30, env="XIAOHONGSHU_TIMEOUT")
+    xiaohongshu_max_images_per_post: int = Field(default=9, env="XIAOHONGSHU_MAX_IMAGES_PER_POST")
+    xiaohongshu_max_title_length: int = Field(default=20, env="XIAOHONGSHU_MAX_TITLE_LENGTH")
+    xiaohongshu_max_content_length: int = Field(default=1000, env="XIAOHONGSHU_MAX_CONTENT_LENGTH")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

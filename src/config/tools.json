@@ -1,0 +1,100 @@
+{
+  "providers": {
+    "calculator": {
+      "class": "src.core.tool_providers.CalculatorToolProvider",
+      "enabled": true,
+      "config": {}
+    },
+    "xiaohongshu": {
+      "class": "src.core.tool_providers.XiaohongshuToolProvider",
+      "enabled": true,
+      "config": {
+        "headless": true,
+        "timeout": 30,
+        "max_images_per_post": 9,
+        "max_title_length": 20,
+        "max_content_length": 1000
+      }
+    }
+  },
+  "tools": {
+    "calculate": {
+      "enabled": true,
+      "category": "calculator",
+      "provider": "calculator",
+      "config": {}
+    },
+    "solve_quadratic": {
+      "enabled": true,
+      "category": "calculator",
+      "provider": "calculator",
+      "config": {}
+    },
+    "unit_converter": {
+      "enabled": true,
+      "category": "calculator",
+      "provider": "calculator",
+      "config": {}
+    },
+    "statistics_calculator": {
+      "enabled": true,
+      "category": "calculator",
+      "provider": "calculator",
+      "config": {}
+    },
+    "check_login_status": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "publish_content": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "list_feeds": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "search_feeds": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "get_feed_detail": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "post_comment_to_feed": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "user_profile": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "get_login_qrcode": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    },
+    "wait_for_login": {
+      "enabled": true,
+      "category": "xiaohongshu",
+      "provider": "xiaohongshu",
+      "config": {}
+    }
+  }
+}

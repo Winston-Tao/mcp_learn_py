@@ -1,8 +1,8 @@
 #!/bin/bash
-"""
-MCP Learning Server Control Script
-Simplifies starting and stopping the MCP server with proper environment setup.
-"""
+#
+# MCP Learning Server Control Script
+# Simplifies starting and stopping the MCP server with proper environment setup.
+#
 
 set -euo pipefail  # Exit on errors, undefined vars, pipe failures
 
@@ -33,7 +33,7 @@ print_usage() {
     cat << EOF
 MCP Learning Server Control Script
 
-Usage: $0 {start|stop|restart|status|logs} [options]
+Usage: $0 {start|stop|restart|status|logs|tools|config|login} [options]
 
 Commands:
     start [transport] [options]    Start the server
@@ -41,22 +41,43 @@ Commands:
     restart [transport] [options] Restart the server
     status                        Check server status
     logs                          Show recent server logs
+    tools                         List all available tools
+    config [reload]              Show or reload tool configuration
+    login [status|qrcode|interactive|clear|info]  Manage Xiaohongshu login
 
 Transport options:
-    stdio                         STDIO transport (default)
+    stdio                         STDIO transport (default, redirects to HTTP)
     http                          HTTP transport
 
 HTTP options:
     --host HOST                   Server host (default: localhost)
     --port PORT                   Server port (default: 8000)
+    --config CONFIG              Custom tools configuration file
+
+Tool management:
+    --list-tools                 List all available tools
+    --reload-config             Reload tools configuration
+
+Login management:
+    status                       Check current login status
+    qrcode                       Get QR code for login (requires GUI)
+    interactive                  Interactive login process
+    clear                        Clear saved login session
+    info                         Show cookie information
 
 Examples:
-    $0 start                      # Start with STDIO transport
+    $0 start                      # Start with HTTP transport (default)
     $0 start http                 # Start with HTTP transport
     $0 start http --port 8080     # Start HTTP on custom port
+    $0 start --config custom.json # Start with custom config
     $0 stop                       # Stop all server processes
     $0 restart http               # Restart with HTTP transport
     $0 status                     # Check if server is running
+    $0 tools                      # List all available tools
+    $0 config reload              # Reload tool configuration
+    $0 login status               # Check Xiaohongshu login status
+    $0 login interactive          # Start interactive login process
+    $0 login clear                # Clear saved login session
 
 EOF
 }
@@ -190,6 +211,112 @@ show_logs() {
     print_colored $YELLOW "💡 Tip: For real-time logs, run the server in foreground mode"
 }
 
+list_tools() {
+    print_colored $BLUE "🔧 Available Tools"
+    print_colored $BLUE "=" $(printf '=%.0s' {1..50})
+
+    setup_environment
+
+    if uv run python scripts/start_server.py --list-tools; then
+        print_colored $GREEN "✅ Tools list completed"
+    else
+        print_colored $RED "❌ Failed to list tools"
+        return 1
+    fi
+}
+
+manage_config() {
+    local action=${1:-show}
+
+    print_colored $BLUE "⚙️  Tool Configuration Management"
+    print_colored $BLUE "=" $(printf '=%.0s' {1..50})
+
+    setup_environment
+
+    case $action in
+        reload)
+            print_colored $BLUE "🔄 Reloading tool configuration..."
+            if uv run python scripts/start_server.py --reload-config; then
+                print_colored $GREEN "✅ Configuration reloaded successfully"
+            else
+                print_colored $RED "❌ Failed to reload configuration"
+                return 1
+            fi
+            ;;
+        show|*)
+            print_colored $BLUE "📋 Current tool configuration:"
+            echo
+            print_colored $BLUE "Configuration file location:"
+            print_colored $YELLOW "  $PROJECT_ROOT/src/config/tools.json"
+            echo
+            print_colored $BLUE "To view or edit configuration:"
+            print_colored $YELLOW "  cat $PROJECT_ROOT/src/config/tools.json"
+            print_colored $YELLOW "  $0 config reload  # After making changes"
+            echo
+            print_colored $BLUE "Available tools:"
+            uv run python scripts/start_server.py --list-tools 2>/dev/null | grep -E "^  [✓✗]" || true
+            ;;
+    esac
+}
+
+manage_login() {
+    local action=${1:-status}
+
+    print_colored $BLUE "🔑 Xiaohongshu Login Management"
+    print_colored $BLUE "=" $(printf '=%.0s' {1..50})
+
+    setup_environment
+
+    case $action in
+        status)
+            print_colored $BLUE "🔍 Checking login status..."
+            if uv run python scripts/login.py --status --headless; then
+                print_colored $GREEN "✅ You are currently logged in"
+            else
+                print_colored $YELLOW "⚠️  You are not logged in"
+                print_colored $BLUE "💡 To login, run: $0 login interactive"
+            fi
+            ;;
+        interactive)
+            print_colored $BLUE "🚀 Starting interactive login process..."
+            uv run python scripts/login.py --login
+            ;;
+        clear)
+            print_colored $BLUE "🧹 Clearing saved login session..."
+            if uv run python scripts/login.py --clear; then
+                print_colored $GREEN "✅ Login session cleared successfully"
+            else
+                print_colored $RED "❌ Failed to clear login session"
+                return 1
+            fi
+            ;;
+        info)
+            print_colored $BLUE "📊 Cookie information:"
+            uv run python scripts/login.py --info
+            ;;
+        qrcode)
+            print_colored $BLUE "📱 Getting QR code for login..."
+            print_colored $YELLOW "⚠️  This feature requires a GUI environment"
+            print_colored $BLUE "💡 For headless environments, use: $0 login interactive"
+            # This would require implementing QR code display in the login script
+            print_colored $RED "❌ QR code display not yet implemented in CLI"
+            print_colored $BLUE "🔄 Use interactive mode instead: $0 login interactive"
+            ;;
+        *)
+            # print_colored $RED "❌ Unknown login action: $action"
+            # echo
+            # print_colored $BLUE "Available login actions:"
+            # print_colored $YELLOW "  status      - Check current login status"
+            # print_colored $YELLOW "  interactive - Start interactive login process"
+            # print_colored $YELLOW "  clear       - Clear saved login session"
+            # print_colored $YELLOW "  info        - Show cookie information"
+            # print_colored $YELLOW "  qrcode      - Get QR code (GUI required)"
+            print_colored $BLUE "📊 default login:"
+            uv run python scripts/login.py "$@"
+            ;;
+    esac
+}
+
 # Main command processing
 case "${1:-}" in
     start)
@@ -209,6 +336,17 @@ case "${1:-}" in
         ;;
     logs)
         show_logs
+        ;;
+    tools)
+        list_tools
+        ;;
+    config)
+        shift
+        manage_config "$@"
+        ;;
+    login)
+        shift
+        manage_login "$@"
         ;;
     -h|--help|help)
         print_usage

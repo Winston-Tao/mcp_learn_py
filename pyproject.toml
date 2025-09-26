@@ -38,6 +38,10 @@ dependencies = [
     # HTTP client
     "httpx>=0.24.0",
 
+    # Browser automation for Xiaohongshu
+    "selenium>=4.15.0",
+    "webdriver-manager>=4.0.0",
+
     # Utilities
     "structlog>=21.5.0",
     "beautifulsoup4>=4.10.0",
