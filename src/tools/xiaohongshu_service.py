@@ -254,7 +254,7 @@ class XiaohongshuService:
                 self.logger.error(f"Failed to initialize driver: {e}")
                 raise XiaohongshuError(f"Driver initialization failed: {e}")
 
-    async def _safe_navigate(self, url: str, max_retries: int = 3) -> bool:
+    async def _safe_navigate(self, url: str, max_retries: int = 2) -> bool:
         """Safely navigate to URL with retries.
 
         Args:
@@ -273,7 +273,7 @@ class XiaohongshuService:
                 self.driver.get(url)
                 # Wait for page to load
                 self.logger.debug("Waiting for page to load...")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)  # Reduced from 2 seconds
                 final_url = self.driver.current_url
                 self.logger.info(f"Navigation successful. Final URL: {final_url}")
                 return True
@@ -281,7 +281,7 @@ class XiaohongshuService:
                 self.logger.warning(f"Navigation attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
                     self.logger.debug("Retrying navigation after delay...")
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.5)  # Reduced from 1 second
                     # Try to recover driver
                     if self.driver:
                         try:
@@ -296,7 +296,7 @@ class XiaohongshuService:
             except Exception as e:
                 self.logger.error(f"Unexpected error during navigation: {e}")
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(0.5)  # Reduced from 1 second
                     if self.driver:
                         try:
                             self.driver.quit()
@@ -624,7 +624,7 @@ class XiaohongshuService:
             self.logger.error(f"Error during login wait: {e}")
             return False
 
-    @retry_on_error(max_retries=2, delay=2.0, exceptions=(WebDriverException, TimeoutException))
+    @retry_on_error(max_retries=2, delay=1.0, exceptions=(WebDriverException, TimeoutException))
     async def publish_content(self, request: PublishContentRequest) -> PublishContentResponse:
         """Publish content to Xiaohongshu.
 
@@ -675,11 +675,11 @@ class XiaohongshuService:
             try:
                 upload_content_selector = "div.upload-content"
                 self.logger.info(f"Waiting for upload content area: {upload_content_selector}")
-                WebDriverWait(self.driver, 10).until(
+                WebDriverWait(self.driver, 5).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, upload_content_selector))
                 )
                 self.logger.info("Upload content area found successfully")
-                await asyncio.sleep(2)
+                await asyncio.sleep(1)  # Reduced from 2 seconds
             except TimeoutException:
                 current_url = self.driver.current_url.lower()
                 self.logger.error(f"Timeout waiting for upload content area. Current URL: {current_url}")
@@ -729,8 +729,8 @@ class XiaohongshuService:
                                     element.click()
                                     self.logger.info("Click executed, waiting for page response...")
 
-                                    # Wait and verify the click took effect (based on Go implementation)
-                                    await asyncio.sleep(1)  # Go version waits 1 second
+                                    # Wait and verify the click took effect (reduced from 1 second)
+                                    await asyncio.sleep(0.5)  # Reduced from 1 second
 
                                     # Check if upload area appeared after click
                                     try:
@@ -746,7 +746,7 @@ class XiaohongshuService:
                                         page_changed = False
                                         for indicator in upload_indicators:
                                             try:
-                                                WebDriverWait(self.driver, 2).until(
+                                                WebDriverWait(self.driver, 1).until(
                                                     EC.presence_of_element_located((By.CSS_SELECTOR, indicator))
                                                 )
                                                 self.logger.info(f"Upload interface appeared with indicator: {indicator}")
@@ -783,7 +783,7 @@ class XiaohongshuService:
                         self.logger.debug(f"Found {len(all_buttons)} buttons and {len(all_divs)} divs on page")
 
                         # Log first few button texts
-                        for i, btn in enumerate(all_buttons[:10]):
+                        for i, btn in enumerate(all_buttons[:5]):  # Reduced from 10
                             try:
                                 if btn.is_displayed():
                                     self.logger.debug(f"Button {i}: '{btn.text}'")
@@ -831,7 +831,7 @@ class XiaohongshuService:
                 for i, selector in enumerate(title_selectors):
                     try:
                         self.logger.debug(f"Trying title selector {i+1}/{len(title_selectors)}: {selector}")
-                        title_input = WebDriverWait(self.driver, 3).until(
+                        title_input = WebDriverWait(self.driver, 2).until(
                             EC.presence_of_element_located((By.CSS_SELECTOR, selector))
                         )
                         if title_input.is_displayed():
@@ -847,8 +847,18 @@ class XiaohongshuService:
                 if title_input:
                     self.logger.info(f"Filling title: {request.title[:30]}...")
                     title_input.clear()
-                    title_input.send_keys(request.title)
-                    await asyncio.sleep(1)
+
+                    # Handle emoji characters that ChromeDriver doesn't support
+                    processed_title = self._sanitize_title_for_chromedriver(request.title)
+
+                    try:
+                        title_input.send_keys(processed_title)
+                    except Exception as send_keys_error:
+                        self.logger.warning(f"Send keys failed: {send_keys_error}, trying JavaScript approach")
+                        # Use JavaScript to set the value
+                        self.driver.execute_script("arguments[0].value = arguments[1]", title_input, processed_title)
+
+                    await asyncio.sleep(0.5)  # Reduced from 1 second
                     title_input_found = True
                     self.logger.info("Successfully filled title")
 
@@ -904,7 +914,7 @@ class XiaohongshuService:
                         self.logger.debug("Using textarea approach")
                         content_input.clear()
                         content_input.send_keys(request.content)
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(1)  # Reduced from 2 seconds
                     self.logger.info("Successfully filled content")
                 else:
                     self.logger.error("No content input element found")
@@ -937,7 +947,7 @@ class XiaohongshuService:
 
                 submit_button = None
                 submit_attempts = 0
-                max_submit_attempts = 3
+                max_submit_attempts = 2  # Reduced from 3
 
                 while submit_attempts < max_submit_attempts and not submit_button:
                     submit_attempts += 1
@@ -957,19 +967,19 @@ class XiaohongshuService:
                             continue
 
                     if not submit_button and submit_attempts < max_submit_attempts:
-                        await asyncio.sleep(2)  # Wait and try again
+                        await asyncio.sleep(1)  # Reduced from 2 seconds
 
                 if submit_button:
                     try:
                         # Scroll to button if needed
                         self.driver.execute_script("arguments[0].scrollIntoView(true);", submit_button)
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(0.5)  # Reduced from 1 second
 
                         # Try to click the button
                         submit_button.click()
                         self.logger.info("Submit button clicked successfully")
 
-                        await asyncio.sleep(5)  # Wait for submission
+                        await asyncio.sleep(3)  # Reduced from 5 seconds
 
                         # Check if publish was successful
                         current_url = self.driver.current_url.lower()
@@ -1048,7 +1058,7 @@ class XiaohongshuService:
             self.logger.info("Waiting for .upload-input element to appear...")
             try:
                 # Use explicit wait like Go version: pp.MustElement(".upload-input")
-                upload_input = WebDriverWait(self.driver, 30).until(
+                upload_input = WebDriverWait(self.driver, 15).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, ".upload-input"))
                 )
                 self.logger.info("Found .upload-input element successfully")
@@ -1104,12 +1114,12 @@ class XiaohongshuService:
             if valid_image_paths:
                 # Upload all images at once (similar to Go implementation)
                 upload_input.send_keys('\n'.join(valid_image_paths))
-                await asyncio.sleep(3)  # Wait for upload
+                await asyncio.sleep(2)  # Reduced from 3 seconds
 
                 # Wait for image preview area to show uploaded images (based on Go implementation)
                 try:
                     preview_selector = ".img-preview-area .pr"
-                    WebDriverWait(self.driver, 10).until(
+                    WebDriverWait(self.driver, 5).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, preview_selector))
                     )
                     self.logger.debug("Image upload completed successfully")
@@ -1951,3 +1961,53 @@ class XiaohongshuService:
         except Exception as e:
             self.logger.warning(f"Failed to extract xsec_token from page: {e}")
             return f"page_token_{int(time.time())}"
+
+    def _sanitize_title_for_chromedriver(self, title: str) -> str:
+        """Sanitize title to handle ChromeDriver's BMP character limitation.
+
+        ChromeDriver only supports characters in the Basic Multilingual Plane (BMP).
+        This function removes or replaces emojis and other non-BMP characters.
+
+        Args:
+            title: Original title string
+
+        Returns:
+            str: Sanitized title compatible with ChromeDriver
+        """
+        try:
+            # Try to keep emojis by using JavaScript approach first
+            # If that fails, we'll remove problematic characters
+
+            # Check if title contains non-BMP characters
+            has_non_bmp = any(ord(char) > 0xFFFF for char in title)
+
+            if not has_non_bmp:
+                return title  # Title is already BMP-safe
+
+            # Try to replace common emojis with text equivalents
+            emoji_replacements = {
+                "🤔": "[思考]",
+                "😅": "[尴尬]",
+                "🚗": "[汽车]",
+                "💸": "[金钱]",
+                "⚡": "[闪电]",
+                "😍": "[心动]",
+                "🙏": "[感谢]",
+                "👉": "[指向]",
+                "💬": "[对话]"
+            }
+
+            processed_title = title
+            for emoji, replacement in emoji_replacements.items():
+                processed_title = processed_title.replace(emoji, replacement)
+
+            # If there are still non-BMP characters, remove them
+            if any(ord(char) > 0xFFFF for char in processed_title):
+                processed_title = ''.join(char for char in processed_title if ord(char) <= 0xFFFF)
+                self.logger.warning("Removed remaining non-BMP characters from title")
+
+            return processed_title
+
+        except Exception as e:
+            self.logger.warning(f"Error sanitizing title: {e}, using original title")
+            return title
